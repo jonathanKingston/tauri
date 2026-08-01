@@ -854,7 +854,7 @@ impl<R: Runtime, C: DeserializeOwned> Plugin<R> for TauriPlugin<R, C> {
 }
 
 /// Plugin collection type.
-#[default_runtime(crate::Wry, wry)]
+#[default_runtime(crate::Wry, wry_runtime)]
 pub(crate) struct PluginStore<R: Runtime> {
   store: Vec<Box<dyn Plugin<R>>>,
 }

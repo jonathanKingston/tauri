@@ -207,7 +207,7 @@ impl Response {
 /// The message and resolver given to a custom command.
 ///
 /// This struct is used internally by macros and is explicitly **NOT** stable.
-#[default_runtime(crate::Wry, wry)]
+#[default_runtime(crate::Wry, wry_runtime)]
 pub struct Invoke<R: Runtime> {
   /// The message passed.
   pub message: InvokeMessage<R>,
@@ -282,7 +282,7 @@ impl From<InvokeError> for InvokeResponse {
 }
 
 /// Resolver of a invoke message.
-#[default_runtime(crate::Wry, wry)]
+#[default_runtime(crate::Wry, wry_runtime)]
 pub struct InvokeResolver<R: Runtime> {
   webview: Webview<R>,
   responder: Arc<Mutex<Option<Box<OwnedInvokeResponder<R>>>>>,
@@ -493,7 +493,7 @@ impl<R: Runtime> InvokeResolver<R> {
 }
 
 /// An invoke message.
-#[default_runtime(crate::Wry, wry)]
+#[default_runtime(crate::Wry, wry_runtime)]
 #[derive(Debug)]
 pub struct InvokeMessage<R: Runtime> {
   /// The webview that received the invoke message.

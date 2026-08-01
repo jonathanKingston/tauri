@@ -997,7 +997,7 @@ pub(crate) struct WindowMenu<R: Runtime> {
 ///
 /// This type also implements [`Manager`] which allows you to manage other windows attached to
 /// the same application.
-#[default_runtime(crate::Wry, wry)]
+#[default_runtime(crate::Wry, wry_runtime)]
 pub struct Window<R: Runtime> {
   /// The window created by the runtime.
   pub(crate) window: DetachedWindow<EventLoopMessage, R>,

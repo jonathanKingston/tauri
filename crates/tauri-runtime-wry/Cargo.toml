@@ -13,10 +13,7 @@ edition.workspace = true
 rust-version.workspace = true
 
 [dependencies]
-wry = { version = "0.56.0", default-features = false, features = [
-  "os-webview",
-  "linux-body",
-] }
+wry = { version = "0.56.0", default-features = false }
 tao = { version = "0.36.0", default-features = false, features = ["rwh_06"] }
 tauri-runtime = { version = "2.11.3", path = "../tauri-runtime" }
 tauri-utils = { version = "2.9.3", path = "../tauri-utils" }
@@ -58,7 +55,9 @@ objc2-app-kit = { version = "0.3.2", default-features = false, features = [
 jni = "0.21"
 
 [features]
-default = ["x11", "dbus"]
+default = ["os-webview", "x11", "dbus"]
+os-webview = ["wry/os-webview", "wry/linux-body"]
+servo = ["wry/servo"]
 devtools = ["wry/devtools", "tauri-runtime/devtools"]
 x11 = ["tao/x11", "wry/x11"]
 macos-private-api = ["tauri-runtime/macos-private-api"]

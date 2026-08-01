@@ -117,12 +117,12 @@ pub use tauri_utils as utils;
 pub use http;
 
 /// A Tauri [`Runtime`] wrapper around wry.
-#[cfg(feature = "wry")]
-#[cfg_attr(docsrs, doc(cfg(feature = "wry")))]
+#[cfg(feature = "wry_runtime")]
+#[cfg_attr(docsrs, doc(cfg(feature = "wry_runtime")))]
 pub type Wry = tauri_runtime_wry::Wry<EventLoopMessage>;
 /// A Tauri [`RuntimeHandle`] wrapper around wry.
-#[cfg(feature = "wry")]
-#[cfg_attr(docsrs, doc(cfg(feature = "wry")))]
+#[cfg(feature = "wry_runtime")]
+#[cfg_attr(docsrs, doc(cfg(feature = "wry_runtime")))]
 pub type WryHandle = tauri_runtime_wry::WryHandle<EventLoopMessage>;
 
 #[cfg(all(feature = "wry", target_os = "android"))]
@@ -195,8 +195,8 @@ use std::{
 };
 use utils::assets::{AssetKey, CspHash, EmbeddedAssets};
 
-#[cfg(feature = "wry")]
-#[cfg_attr(docsrs, doc(cfg(feature = "wry")))]
+#[cfg(feature = "wry_runtime")]
+#[cfg_attr(docsrs, doc(cfg(feature = "wry_runtime")))]
 pub use tauri_runtime_wry::webview_version;
 
 #[cfg(target_os = "macos")]
@@ -345,7 +345,7 @@ impl<R: Runtime> Assets<R> for EmbeddedAssets {
 /// # Stability
 /// This is the output of the [`generate_context`] macro, and is not considered part of the stable API.
 /// Unless you know what you are doing and are prepared for this type to have breaking changes, do not create it yourself.
-#[tauri_macros::default_runtime(Wry, wry)]
+#[tauri_macros::default_runtime(Wry, wry_runtime)]
 pub struct Context<R: Runtime> {
   pub(crate) config: Config,
   #[cfg(dev)]

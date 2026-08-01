@@ -12,12 +12,11 @@
   const __TAURI_INVOKE_KEY__ = __TEMPLATE_invoke_key__
 
   const processIpcMessage = __RAW_process_ipc_message_fn__
-  const osName = __TEMPLATE_os_name__
   const fetchChannelDataCommand = __TEMPLATE_fetch_channel_data_command__
   let customProtocolIpcFailed = false
 
-  // on Android we never use it because Android does not have support to reading the request body
-  const canUseCustomProtocol = osName !== 'android'
+  // Android and Servo do not expose custom protocol request bodies.
+  const canUseCustomProtocol = __TEMPLATE_can_use_custom_protocol__
 
   function sendIpcMessage(message) {
     const { cmd, callback, error, payload, options } = message

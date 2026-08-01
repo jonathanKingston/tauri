@@ -146,19 +146,22 @@ pub struct InvokeRequest {
 }
 
 /// The platform webview handle. Accessed with [`Webview#method.with_webview`];
-#[cfg(feature = "wry")]
-#[cfg_attr(docsrs, doc(cfg(feature = "wry")))]
+#[cfg(feature = "wry_runtime")]
+#[cfg_attr(docsrs, doc(cfg(feature = "wry_runtime")))]
 pub struct PlatformWebview(tauri_runtime_wry::Webview);
 
-#[cfg(feature = "wry")]
+#[cfg(feature = "wry_runtime")]
 impl PlatformWebview {
   /// Returns [`webkit2gtk::WebView`] handle.
-  #[cfg(any(
-    target_os = "linux",
-    target_os = "dragonfly",
-    target_os = "freebsd",
-    target_os = "netbsd",
-    target_os = "openbsd"
+  #[cfg(all(
+    feature = "wry",
+    any(
+      target_os = "linux",
+      target_os = "dragonfly",
+      target_os = "freebsd",
+      target_os = "netbsd",
+      target_os = "openbsd"
+    )
   ))]
   #[cfg_attr(
     docsrs,
@@ -175,7 +178,7 @@ impl PlatformWebview {
   }
 
   /// Returns the WebView2 controller.
-  #[cfg(windows)]
+  #[cfg(all(feature = "wry", windows))]
   #[cfg_attr(docsrs, doc(cfg(windows)))]
   pub fn controller(
     &self,
@@ -184,7 +187,7 @@ impl PlatformWebview {
   }
 
   /// Returns the WebView2 environment.
-  #[cfg(windows)]
+  #[cfg(all(feature = "wry", windows))]
   #[cfg_attr(docsrs, doc(cfg(windows)))]
   pub fn environment(
     &self,
@@ -195,7 +198,7 @@ impl PlatformWebview {
   /// Returns the [WKWebView] handle.
   ///
   /// [WKWebView]: https://developer.apple.com/documentation/webkit/wkwebview
-  #[cfg(any(target_os = "macos", target_os = "ios"))]
+  #[cfg(all(feature = "wry", any(target_os = "macos", target_os = "ios")))]
   #[cfg_attr(docsrs, doc(cfg(any(target_os = "macos", target_os = "ios"))))]
   pub fn inner(&self) -> *mut std::ffi::c_void {
     self.0.webview
@@ -204,7 +207,7 @@ impl PlatformWebview {
   /// Returns WKWebView [controller] handle.
   ///
   /// [controller]: https://developer.apple.com/documentation/webkit/wkusercontentcontroller
-  #[cfg(any(target_os = "macos", target_os = "ios"))]
+  #[cfg(all(feature = "wry", any(target_os = "macos", target_os = "ios")))]
   #[cfg_attr(docsrs, doc(cfg(any(target_os = "macos", target_os = "ios"))))]
   pub fn controller(&self) -> *mut std::ffi::c_void {
     self.0.manager
@@ -213,7 +216,7 @@ impl PlatformWebview {
   /// Returns [NSWindow] associated with the WKWebView webview.
   ///
   /// [NSWindow]: https://developer.apple.com/documentation/appkit/nswindow
-  #[cfg(target_os = "macos")]
+  #[cfg(all(feature = "wry", target_os = "macos"))]
   #[cfg_attr(docsrs, doc(cfg(target_os = "macos")))]
   pub fn ns_window(&self) -> *mut std::ffi::c_void {
     self.0.ns_window
@@ -222,7 +225,7 @@ impl PlatformWebview {
   /// Returns [UIViewController] used by the WKWebView webview NSWindow.
   ///
   /// [UIViewController]: https://developer.apple.com/documentation/uikit/uiviewcontroller
-  #[cfg(target_os = "ios")]
+  #[cfg(all(feature = "wry", target_os = "ios"))]
   #[cfg_attr(docsrs, doc(cfg(target_os = "ios")))]
   pub fn view_controller(&self) -> *mut std::ffi::c_void {
     self.0.view_controller
@@ -1354,7 +1357,7 @@ fn main() {
 }
 
 /// Webview.
-#[default_runtime(crate::Wry, wry)]
+#[default_runtime(crate::Wry, wry_runtime)]
 pub struct Webview<R: Runtime> {
   pub(crate) window: Arc<Mutex<Window<R>>>,
   /// The webview created by the runtime.
@@ -1723,8 +1726,8 @@ tauri::Builder::default()
 ```
   "####
   )]
-  #[cfg(feature = "wry")]
-  #[cfg_attr(docsrs, doc(cfg(feature = "wry")))]
+  #[cfg(feature = "wry_runtime")]
+  #[cfg_attr(docsrs, doc(cfg(feature = "wry_runtime")))]
   pub fn with_webview<F: FnOnce(PlatformWebview) + Send + 'static>(
     &self,
     f: F,

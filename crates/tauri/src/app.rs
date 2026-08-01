@@ -381,7 +381,7 @@ impl<R: Runtime> AssetResolver<R> {
 /// A handle to the currently running application.
 ///
 /// This type implements [`Manager`] which allows for manipulation of global application items.
-#[default_runtime(crate::Wry, wry)]
+#[default_runtime(crate::Wry, wry_runtime)]
 #[derive(Debug)]
 pub struct AppHandle<R: Runtime> {
   pub(crate) runtime_handle: R::Handle,
@@ -396,7 +396,7 @@ struct EventLoop {
 }
 
 /// APIs specific to the wry runtime.
-#[cfg(feature = "wry")]
+#[cfg(feature = "wry_runtime")]
 impl AppHandle<crate::Wry> {
   /// Create a new tao window using a callback. The event loop must be running at this point.
   pub fn create_tao_window<
@@ -725,7 +725,7 @@ impl<R: Runtime> ManagerBase<R> for AppHandle<R> {
 /// The instance of the currently running application.
 ///
 /// This type implements [`Manager`] which allows for manipulation of global application items.
-#[default_runtime(crate::Wry, wry)]
+#[default_runtime(crate::Wry, wry_runtime)]
 pub struct App<R: Runtime> {
   runtime: Option<R>,
   setup: Option<SetupHook<R>>,
@@ -783,7 +783,7 @@ impl<R: Runtime> ManagerBase<R> for App<R> {
 }
 
 /// APIs specific to the wry runtime.
-#[cfg(feature = "wry")]
+#[cfg(feature = "wry_runtime")]
 impl App<crate::Wry> {
   /// Adds a [`tauri_runtime_wry::Plugin`] using its [`tauri_runtime_wry::PluginBuilder`].
   ///
@@ -1557,22 +1557,22 @@ pub(crate) struct InvokeInitializationScript<'a> {
   /// The function that processes the IPC message.
   #[raw]
   pub(crate) process_ipc_message_fn: &'a str,
-  pub(crate) os_name: &'a str,
   pub(crate) fetch_channel_data_command: &'a str,
   pub(crate) invoke_key: &'a str,
+  pub(crate) can_use_custom_protocol: bool,
 }
 
 /// Make `Wry` the default `Runtime` for `Builder`
-#[cfg(feature = "wry")]
-#[cfg_attr(docsrs, doc(cfg(feature = "wry")))]
+#[cfg(feature = "wry_runtime")]
+#[cfg_attr(docsrs, doc(cfg(feature = "wry_runtime")))]
 impl Default for Builder<crate::Wry> {
   fn default() -> Self {
     Self::new()
   }
 }
 
-#[cfg(not(feature = "wry"))]
-#[cfg_attr(docsrs, doc(cfg(not(feature = "wry"))))]
+#[cfg(not(feature = "wry_runtime"))]
+#[cfg_attr(docsrs, doc(cfg(not(feature = "wry_runtime"))))]
 impl<R: Runtime> Default for Builder<R> {
   fn default() -> Self {
     Self::new()
@@ -1591,9 +1591,9 @@ impl<R: Runtime> Builder<R> {
       invoke_handler: Box::new(|_| false),
       invoke_initialization_script: InvokeInitializationScript {
         process_ipc_message_fn: crate::manager::webview::PROCESS_IPC_MESSAGE_FN,
-        os_name: std::env::consts::OS,
         fetch_channel_data_command: crate::ipc::channel::FETCH_CHANNEL_DATA_COMMAND,
         invoke_key: &invoke_key.clone(),
+        can_use_custom_protocol: !cfg!(any(target_os = "android", feature = "servo")),
       }
       .render_default(&Default::default())
       .unwrap()
@@ -2648,7 +2648,7 @@ mod tests {
     crate::test_utils::assert_send::<super::AppHandle>();
     crate::test_utils::assert_sync::<super::AppHandle>();
 
-    #[cfg(feature = "wry")]
+    #[cfg(feature = "wry_runtime")]
     {
       crate::test_utils::assert_send::<super::AssetResolver<crate::Wry>>();
       crate::test_utils::assert_sync::<super::AssetResolver<crate::Wry>>();

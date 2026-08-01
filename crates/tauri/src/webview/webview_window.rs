@@ -1509,7 +1509,7 @@ impl<R: Runtime, M: Manager<R>> WebviewWindowBuilder<'_, R, M> {
 }
 
 /// A type that wraps a [`Window`] together with a [`Webview`].
-#[default_runtime(crate::Wry, wry)]
+#[default_runtime(crate::Wry, wry_runtime)]
 #[derive(Debug)]
 pub struct WebviewWindow<R: Runtime> {
   pub(crate) window: Window<R>,
@@ -2439,8 +2439,8 @@ impl<R: Runtime> WebviewWindow<R> {
   /// }
   /// ```
   #[allow(clippy::needless_doctest_main)] // To avoid a large diff
-  #[cfg(feature = "wry")]
-  #[cfg_attr(docsrs, doc(cfg(feature = "wry")))]
+  #[cfg(feature = "wry_runtime")]
+  #[cfg_attr(docsrs, doc(cfg(feature = "wry_runtime")))]
   pub fn with_webview<F: FnOnce(crate::webview::PlatformWebview) + Send + 'static>(
     &self,
     f: F,

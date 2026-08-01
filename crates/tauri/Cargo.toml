@@ -206,7 +206,14 @@ tray-icon = ["dep:tray-icon"]
 tracing = ["dep:tracing", "tauri-macros/tracing", "tauri-runtime-wry?/tracing"]
 test = []
 compression = ["tauri-macros/compression", "tauri-utils/compression"]
-wry = ["webview2-com", "webkit2gtk", "tauri-runtime-wry"]
+wry_runtime = ["tauri-runtime-wry"]
+wry = [
+  "wry_runtime",
+  "webview2-com",
+  "webkit2gtk",
+  "tauri-runtime-wry/os-webview",
+]
+servo = ["wry_runtime", "tauri-runtime-wry/servo"]
 # TODO: Remove in v3 - wry does not have this feature anymore
 objc-exception = []
 linux-libxdo = ["tray-icon/libxdo", "muda/libxdo"]

@@ -2,18 +2,21 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-License-Identifier: MIT
 
-#[cfg(any(
-  target_os = "linux",
-  target_os = "dragonfly",
-  target_os = "freebsd",
-  target_os = "netbsd",
-  target_os = "openbsd"
+#[cfg(all(
+  not(feature = "servo"),
+  any(
+    target_os = "linux",
+    target_os = "dragonfly",
+    target_os = "freebsd",
+    target_os = "netbsd",
+    target_os = "openbsd"
+  )
 ))]
 mod imp {
   pub type Webview = webkit2gtk::WebView;
 }
 
-#[cfg(target_vendor = "apple")]
+#[cfg(all(not(feature = "servo"), target_vendor = "apple"))]
 mod imp {
   use std::ffi::c_void;
 
@@ -29,7 +32,7 @@ mod imp {
   }
 }
 
-#[cfg(windows)]
+#[cfg(all(not(feature = "servo"), windows))]
 mod imp {
   use webview2_com::Microsoft::Web::WebView2::Win32::{
     ICoreWebView2Controller, ICoreWebView2Environment,
@@ -40,10 +43,16 @@ mod imp {
   }
 }
 
-#[cfg(target_os = "android")]
+#[cfg(all(not(feature = "servo"), target_os = "android"))]
 mod imp {
   use wry::JniHandle;
   pub type Webview = JniHandle;
+}
+
+#[cfg(feature = "servo")]
+mod imp {
+  /// Servo does not expose a platform-native webview handle.
+  pub struct Webview;
 }
 
 pub use imp::*;

@@ -180,7 +180,7 @@ impl Asset {
   }
 }
 
-#[default_runtime(crate::Wry, wry)]
+#[default_runtime(crate::Wry, wry_runtime)]
 pub struct AppManager<R: Runtime> {
   pub runtime_authority: Mutex<RuntimeAuthority>,
   pub window: window::WindowManager<R>,

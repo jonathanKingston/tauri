@@ -167,9 +167,9 @@ pub fn mock_builder() -> Builder<MockRuntime> {
 
   builder.invoke_initialization_script = crate::app::InvokeInitializationScript {
     process_ipc_message_fn: crate::manager::webview::PROCESS_IPC_MESSAGE_FN,
-    os_name: std::env::consts::OS,
     fetch_channel_data_command: crate::ipc::channel::FETCH_CHANNEL_DATA_COMMAND,
     invoke_key: INVOKE_KEY,
+    can_use_custom_protocol: !cfg!(any(target_os = "android", feature = "servo")),
   }
   .render_default(&Default::default())
   .unwrap()

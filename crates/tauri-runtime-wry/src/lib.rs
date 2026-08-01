@@ -14,7 +14,7 @@
 
 use self::monitor::MonitorExt;
 use http::Request;
-#[cfg(target_os = "macos")]
+#[cfg(all(not(feature = "servo"), target_os = "macos"))]
 use objc2::ClassType;
 use raw_window_handle::{DisplayHandle, HasDisplayHandle, HasWindowHandle};
 
@@ -33,7 +33,7 @@ use tauri_runtime::{
   UserAttentionType, UserEvent, WebviewDispatch, WebviewEventId, WindowDispatch, WindowEventId,
 };
 
-#[cfg(target_vendor = "apple")]
+#[cfg(all(not(feature = "servo"), target_vendor = "apple"))]
 use objc2::rc::Retained;
 #[cfg(target_os = "android")]
 use tao::platform::android::{WindowBuilderExtAndroid, WindowExtAndroid};
@@ -56,14 +56,16 @@ use webview2_com::{
 };
 #[cfg(windows)]
 use windows::Win32::Foundation::HWND;
-#[cfg(target_os = "ios")]
+#[cfg(all(not(feature = "servo"), target_os = "ios"))]
 use wry::WebViewBuilderExtIos;
-#[cfg(target_os = "macos")]
+#[cfg(all(not(feature = "servo"), target_os = "macos"))]
 use wry::WebViewBuilderExtMacos;
-#[cfg(windows)]
+#[cfg(all(not(feature = "servo"), windows))]
 use wry::WebViewBuilderExtWindows;
-#[cfg(target_vendor = "apple")]
+#[cfg(all(not(feature = "servo"), target_vendor = "apple"))]
 use wry::{WebViewBuilderExtDarwin, WebViewExtDarwin};
+#[cfg(feature = "servo")]
+use wry::{WebViewBuilderExtServo, WebViewExtServo};
 
 use tao::{
   event::{Event, StartCause, WindowEvent as TaoWindowEvent},
@@ -98,19 +100,22 @@ pub use tao::window::{Window, WindowBuilder as TaoWindowBuilder, WindowId as Tao
 pub use wry;
 pub use wry::webview_version;
 
-#[cfg(windows)]
+#[cfg(all(not(feature = "servo"), windows))]
 use wry::WebViewExtWindows;
-#[cfg(target_os = "android")]
+#[cfg(all(not(feature = "servo"), target_os = "android"))]
 use wry::{
   prelude::{dispatch, find_class},
   WebViewBuilderExtAndroid, WebViewExtAndroid,
 };
-#[cfg(not(any(
-  target_os = "windows",
-  target_os = "macos",
-  target_os = "ios",
-  target_os = "android"
-)))]
+#[cfg(all(
+  not(feature = "servo"),
+  not(any(
+    target_os = "windows",
+    target_os = "macos",
+    target_os = "ios",
+    target_os = "android"
+  ))
+))]
 use wry::{WebViewBuilderExtUnix, WebViewExtUnix};
 
 #[cfg(target_os = "ios")]
@@ -1501,6 +1506,8 @@ pub enum Message<T: 'static> {
   Application(ApplicationMessage),
   Window(WindowId, WindowMessage),
   Webview(WindowId, WebviewId, WebviewMessage),
+  #[cfg(feature = "servo")]
+  ServoWake(WindowId, WebviewId),
   EventLoopWindowTarget(EventLoopWindowTargetMessage),
   CreateWebview(WindowId, CreateWebviewClosure, Sender<Result<()>>),
   CreateWindow(WindowId, CreateWindowClosure<T>, Sender<Result<()>>),
@@ -3292,7 +3299,7 @@ fn handle_user_message<T: UserEvent>(
       ApplicationMessage::Hide => {
         event_loop.hide_application();
       }
-      #[cfg(any(target_os = "macos", target_os = "ios"))]
+      #[cfg(all(not(feature = "servo"), any(target_os = "macos", target_os = "ios")))]
       ApplicationMessage::FetchDataStoreIdentifiers(cb) => {
         if let Err(e) = WebView::fetch_data_store_identifiers(cb) {
           // this shouldn't ever happen because we're running on the main thread
@@ -3300,12 +3307,16 @@ fn handle_user_message<T: UserEvent>(
           log::error!("failed to fetch data store identifiers: {e}");
         }
       }
-      #[cfg(any(target_os = "macos", target_os = "ios"))]
+      #[cfg(all(not(feature = "servo"), any(target_os = "macos", target_os = "ios")))]
       ApplicationMessage::RemoveDataStore(uuid, cb) => {
         WebView::remove_data_store(&uuid, move |res| {
           cb(res.map_err(|_| Error::FailedToRemoveDataStore))
         })
       }
+      #[cfg(all(feature = "servo", any(target_os = "macos", target_os = "ios")))]
+      ApplicationMessage::FetchDataStoreIdentifiers(cb) => cb(Vec::new()),
+      #[cfg(all(feature = "servo", any(target_os = "macos", target_os = "ios")))]
+      ApplicationMessage::RemoveDataStore(_, cb) => cb(Err(Error::FailedToRemoveDataStore)),
     },
     Message::Window(id, window_message) => {
       let w = windows.0.borrow().get(&id).map(|w| {
@@ -3638,11 +3649,17 @@ fn handle_user_message<T: UserEvent>(
             .get_mut(&new_parent_window_id)
             .map(|w| (w.inner.clone(), &mut w.webviews))
           {
-            #[cfg(target_os = "macos")]
+            #[cfg(feature = "servo")]
+            let _ = &new_parent_window;
+            #[cfg(all(not(feature = "servo"), target_os = "macos"))]
             let reparent_result = {
               use wry::WebViewExtMacOS;
               webview.inner.reparent(new_parent_window.ns_window() as _)
             };
+            #[cfg(feature = "servo")]
+            let reparent_result: wry::Result<()> = Err(wry::Error::Servo(
+              "reparenting embedded Servo webviews is not supported".into(),
+            ));
             #[cfg(windows)]
             let reparent_result = { webview.inner.reparent(new_parent_window.hwnd()) };
 
@@ -3938,7 +3955,7 @@ fn handle_user_message<T: UserEvent>(
             {
               f(webview.webview());
             }
-            #[cfg(target_os = "macos")]
+            #[cfg(all(not(feature = "servo"), target_os = "macos"))]
             {
               use wry::WebViewExtMacOS;
               let platform_webview = webview.webview();
@@ -3949,6 +3966,10 @@ fn handle_user_message<T: UserEvent>(
                 manager: Retained::as_ptr(&manager).cast_mut() as *mut std::ffi::c_void,
                 ns_window: Retained::as_ptr(&ns_window).cast_mut() as *mut std::ffi::c_void,
               });
+            }
+            #[cfg(feature = "servo")]
+            {
+              f(Webview);
             }
             #[cfg(target_os = "ios")]
             {
@@ -4075,6 +4096,8 @@ fn handle_user_message<T: UserEvent>(
       }
     }
 
+    #[cfg(feature = "servo")]
+    Message::ServoWake(_, _) => (),
     Message::UserEvent(_) => (),
     Message::EventLoopWindowTarget(message) => match message {
       EventLoopWindowTargetMessage::CursorPosition(sender) => {
@@ -4120,6 +4143,15 @@ fn handle_event_loop<T: UserEvent>(
     }
 
     Event::MainEventsCleared => {
+      #[cfg(feature = "servo")]
+      if windows.0.borrow().values().any(|window| {
+        window
+          .webviews
+          .iter()
+          .any(|webview| webview.servo().is_animating())
+      }) {
+        *control_flow = ControlFlow::Poll;
+      }
       callback(RunEvent::MainEventsCleared);
     }
 
@@ -4127,7 +4159,7 @@ fn handle_event_loop<T: UserEvent>(
       callback(RunEvent::Exit);
     }
 
-    #[cfg(windows)]
+    #[cfg(all(not(feature = "servo"), windows))]
     Event::RedrawRequested(id) => {
       if let Some(window_id) = window_id_map.get(&id) {
         let mut windows_ref = windows.0.borrow_mut();
@@ -4139,6 +4171,17 @@ fn handle_event_loop<T: UserEvent>(
                 window.draw_surface(surface, background_color);
               }
             }
+          }
+        }
+      }
+    }
+
+    #[cfg(feature = "servo")]
+    Event::RedrawRequested(id) => {
+      if let Some(window_id) = window_id_map.get(&id) {
+        if let Some(window) = windows.0.borrow().get(&window_id) {
+          for webview in &window.webviews {
+            webview.servo().paint();
           }
         }
       }
@@ -4207,6 +4250,13 @@ fn handle_event_loop<T: UserEvent>(
       event, window_id, ..
     } => {
       if let Some(window_id) = window_id_map.get(&window_id) {
+        #[cfg(feature = "servo")]
+        if let Some(window) = windows.0.borrow().get(&window_id) {
+          for webview in &window.webviews {
+            webview.servo().handle_window_event(&event);
+          }
+        }
+
         {
           let windows_ref = windows.0.borrow();
           if let Some(window) = windows_ref.get(&window_id) {
@@ -4292,6 +4342,18 @@ fn handle_event_loop<T: UserEvent>(
       }
     }
     Event::UserEvent(message) => match message {
+      #[cfg(feature = "servo")]
+      Message::ServoWake(window_id, webview_id) => {
+        if let Some(window) = windows.0.borrow().get(&window_id) {
+          if let Some(webview) = window
+            .webviews
+            .iter()
+            .find(|webview| webview.id == webview_id)
+          {
+            webview.servo().handle_user_event();
+          }
+        }
+      }
       Message::RequestExit(code) => {
         let (tx, rx) = channel();
         callback(RunEvent::ExitRequested {
@@ -4740,7 +4802,7 @@ You may have it installed on another user account, but it is not available for t
     webview_builder = webview_builder.with_url(&url);
   }
 
-  #[cfg(target_os = "macos")]
+  #[cfg(all(not(feature = "servo"), target_os = "macos"))]
   if let Some(webview_configuration) = webview_attributes.webview_configuration {
     webview_builder = webview_builder.with_webview_configuration(webview_configuration);
   }
@@ -4819,7 +4881,7 @@ You may have it installed on another user account, but it is not available for t
   }
 
   if let Some(new_window_handler) = pending.new_window_handler {
-    #[cfg(desktop)]
+    #[cfg(all(desktop, not(feature = "servo")))]
     let context = context.clone();
     webview_builder = webview_builder.with_new_window_req_handler(move |url, features| {
       let Ok(url) = url.parse() else {
@@ -4842,7 +4904,9 @@ You may have it installed on another user account, but it is not available for t
       );
       match response {
         tauri_runtime::webview::NewWindowResponse::Allow => wry::NewWindowResponse::Allow,
-        #[cfg(desktop)]
+        #[cfg(all(feature = "servo", desktop))]
+        tauri_runtime::webview::NewWindowResponse::Create { .. } => wry::NewWindowResponse::Deny,
+        #[cfg(all(not(feature = "servo"), desktop))]
         tauri_runtime::webview::NewWindowResponse::Create { window_id } => {
           let windows = &context.main_thread.windows.0;
           let webview = windows
@@ -4903,7 +4967,7 @@ You may have it installed on another user account, but it is not available for t
       None
     }
   } else {
-    #[cfg(feature = "unstable")]
+    #[cfg(any(feature = "unstable", feature = "servo"))]
     {
       webview_builder = webview_builder.with_bounds(wry::Rect {
         position: LogicalPosition::new(0, 0).into(),
@@ -4916,7 +4980,7 @@ You may have it installed on another user account, but it is not available for t
         height_rate: 1.,
       })
     }
-    #[cfg(not(feature = "unstable"))]
+    #[cfg(not(any(feature = "unstable", feature = "servo")))]
     None
   };
 
@@ -5020,7 +5084,7 @@ You may have it installed on another user account, but it is not available for t
     }
   }
 
-  #[cfg(any(target_os = "macos", target_os = "ios"))]
+  #[cfg(all(not(feature = "servo"), any(target_os = "macos", target_os = "ios")))]
   {
     if let Some(data_store_identifier) = &webview_attributes.data_store_identifier {
       webview_builder = webview_builder.with_data_store_identifier(*data_store_identifier);
@@ -5059,7 +5123,7 @@ You may have it installed on another user account, but it is not available for t
     }
   }
 
-  #[cfg(target_os = "ios")]
+  #[cfg(all(not(feature = "servo"), target_os = "ios"))]
   {
     webview_builder = webview_builder.with_limit_navigations_to_app_bound_domains(
       webview_attributes.limit_navigations_to_app_bound_domains,
@@ -5071,7 +5135,7 @@ You may have it installed on another user account, but it is not available for t
     }
   }
 
-  #[cfg(target_os = "macos")]
+  #[cfg(all(not(feature = "servo"), target_os = "macos"))]
   {
     if let Some(position) = &webview_attributes.traffic_light_position {
       webview_builder = webview_builder.with_traffic_light_inset(*position);
@@ -5141,6 +5205,16 @@ You may have it installed on another user account, but it is not available for t
     }
   }
 
+  #[cfg(feature = "servo")]
+  let webview = {
+    let proxy = context.proxy.clone();
+    let servo_window_id = *window_id.lock().unwrap();
+    webview_builder.build_servo_as_child(window, move || {
+      let _ = proxy.send_event(Message::ServoWake(servo_window_id, id));
+    })
+  };
+
+  #[cfg(not(feature = "servo"))]
   let webview = match kind {
     #[cfg(not(any(
       target_os = "windows",
@@ -5180,9 +5254,11 @@ You may have it installed on another user account, but it is not available for t
       };
       builder
     }
-  }
-  .map_err(|e| Error::CreateWebview(Box::new(e)))?;
+  };
 
+  let webview = webview.map_err(|e| Error::CreateWebview(Box::new(e)))?;
+
+  #[cfg(not(feature = "servo"))]
   if kind == WebviewKind::WindowContent {
     #[cfg(any(
       target_os = "linux",
@@ -5198,7 +5274,7 @@ You may have it installed on another user account, but it is not available for t
     }
   }
 
-  #[cfg(windows)]
+  #[cfg(all(not(feature = "servo"), windows))]
   {
     let controller = webview.controller();
     let mut token = 0;
@@ -5274,7 +5350,7 @@ fn create_ipc_handler<T: UserEvent>(
   })
 }
 
-#[cfg(target_os = "macos")]
+#[cfg(all(not(feature = "servo"), target_os = "macos"))]
 fn inner_size(
   window: &Window,
   webviews: &[WebviewWrapper],
@@ -5292,7 +5368,7 @@ fn inner_size(
   window.inner_size()
 }
 
-#[cfg(not(target_os = "macos"))]
+#[cfg(any(feature = "servo", not(target_os = "macos")))]
 #[allow(unused_variables)]
 fn inner_size(
   window: &Window,
