@@ -13,7 +13,7 @@ edition.workspace = true
 rust-version.workspace = true
 
 [dependencies]
-wry = { version = "0.56.0", default-features = false }
+wry = { git = "https://github.com/jonathanKingston/wry.git", rev = "1e9bd0c75a8da8fd3da894c01fc2a690b6e701aa", version = "0.56.0", default-features = false }
 tao = { version = "0.36.0", default-features = false, features = ["rwh_06"] }
 tauri-runtime = { version = "2.11.3", path = "../tauri-runtime" }
 tauri-utils = { version = "2.9.3", path = "../tauri-utils" }

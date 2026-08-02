@@ -2643,6 +2643,20 @@ fn on_event_loop_event<R: Runtime>(
 
 #[cfg(test)]
 mod tests {
+  use serialize_to_javascript::DefaultTemplate;
+
+  fn render_invoke_initialization_script(can_use_custom_protocol: bool) -> String {
+    super::InvokeInitializationScript {
+      process_ipc_message_fn: "function () {}",
+      fetch_channel_data_command: "plugin:event|fetch",
+      invoke_key: "test-invoke-key",
+      can_use_custom_protocol,
+    }
+    .render_default(&Default::default())
+    .unwrap()
+    .into_string()
+  }
+
   #[test]
   fn is_send_sync() {
     crate::test_utils::assert_send::<super::AppHandle>();
@@ -2653,5 +2667,41 @@ mod tests {
       crate::test_utils::assert_send::<super::AssetResolver<crate::Wry>>();
       crate::test_utils::assert_sync::<super::AssetResolver<crate::Wry>>();
     }
+  }
+
+  #[test]
+  fn invoke_initialization_script_enables_custom_protocol_ipc() {
+    let script = render_invoke_initialization_script(true);
+
+    assert!(
+      script.contains("const canUseCustomProtocol = JSON.parse('true')"),
+      "rendered script: {script}"
+    );
+  }
+
+  #[test]
+  fn invoke_initialization_script_disables_custom_protocol_ipc() {
+    let script = render_invoke_initialization_script(false);
+
+    assert!(
+      script.contains("const canUseCustomProtocol = JSON.parse('false')"),
+      "rendered script: {script}"
+    );
+  }
+
+  #[cfg(feature = "servo")]
+  #[test]
+  fn servo_builder_disables_custom_protocol_ipc() {
+    let builder = super::Builder::<crate::test::MockRuntime>::new();
+
+    assert!(builder
+      .invoke_initialization_script
+      .contains("const canUseCustomProtocol = JSON.parse('false')"));
+  }
+
+  #[cfg(feature = "servo")]
+  #[test]
+  fn servo_feature_provides_default_wry_runtime() {
+    let _: super::Builder<crate::Wry> = Default::default();
   }
 }

@@ -155,6 +155,7 @@ impl PlatformWebview {
   /// Returns [`webkit2gtk::WebView`] handle.
   #[cfg(all(
     feature = "wry",
+    not(feature = "servo"),
     any(
       target_os = "linux",
       target_os = "dragonfly",
@@ -178,7 +179,7 @@ impl PlatformWebview {
   }
 
   /// Returns the WebView2 controller.
-  #[cfg(all(feature = "wry", windows))]
+  #[cfg(all(feature = "wry", not(feature = "servo"), windows))]
   #[cfg_attr(docsrs, doc(cfg(windows)))]
   pub fn controller(
     &self,
@@ -187,7 +188,7 @@ impl PlatformWebview {
   }
 
   /// Returns the WebView2 environment.
-  #[cfg(all(feature = "wry", windows))]
+  #[cfg(all(feature = "wry", not(feature = "servo"), windows))]
   #[cfg_attr(docsrs, doc(cfg(windows)))]
   pub fn environment(
     &self,
@@ -198,7 +199,11 @@ impl PlatformWebview {
   /// Returns the [WKWebView] handle.
   ///
   /// [WKWebView]: https://developer.apple.com/documentation/webkit/wkwebview
-  #[cfg(all(feature = "wry", any(target_os = "macos", target_os = "ios")))]
+  #[cfg(all(
+    feature = "wry",
+    not(feature = "servo"),
+    any(target_os = "macos", target_os = "ios")
+  ))]
   #[cfg_attr(docsrs, doc(cfg(any(target_os = "macos", target_os = "ios"))))]
   pub fn inner(&self) -> *mut std::ffi::c_void {
     self.0.webview
@@ -207,7 +212,11 @@ impl PlatformWebview {
   /// Returns WKWebView [controller] handle.
   ///
   /// [controller]: https://developer.apple.com/documentation/webkit/wkusercontentcontroller
-  #[cfg(all(feature = "wry", any(target_os = "macos", target_os = "ios")))]
+  #[cfg(all(
+    feature = "wry",
+    not(feature = "servo"),
+    any(target_os = "macos", target_os = "ios")
+  ))]
   #[cfg_attr(docsrs, doc(cfg(any(target_os = "macos", target_os = "ios"))))]
   pub fn controller(&self) -> *mut std::ffi::c_void {
     self.0.manager
@@ -216,7 +225,7 @@ impl PlatformWebview {
   /// Returns [NSWindow] associated with the WKWebView webview.
   ///
   /// [NSWindow]: https://developer.apple.com/documentation/appkit/nswindow
-  #[cfg(all(feature = "wry", target_os = "macos"))]
+  #[cfg(all(feature = "wry", not(feature = "servo"), target_os = "macos"))]
   #[cfg_attr(docsrs, doc(cfg(target_os = "macos")))]
   pub fn ns_window(&self) -> *mut std::ffi::c_void {
     self.0.ns_window
@@ -225,14 +234,14 @@ impl PlatformWebview {
   /// Returns [UIViewController] used by the WKWebView webview NSWindow.
   ///
   /// [UIViewController]: https://developer.apple.com/documentation/uikit/uiviewcontroller
-  #[cfg(all(feature = "wry", target_os = "ios"))]
+  #[cfg(all(feature = "wry", not(feature = "servo"), target_os = "ios"))]
   #[cfg_attr(docsrs, doc(cfg(target_os = "ios")))]
   pub fn view_controller(&self) -> *mut std::ffi::c_void {
     self.0.view_controller
   }
 
   /// Returns handle for JNI execution.
-  #[cfg(target_os = "android")]
+  #[cfg(all(not(feature = "servo"), target_os = "android"))]
   pub fn jni_handle(&self) -> tauri_runtime_wry::wry::JniHandle {
     self.0
   }
