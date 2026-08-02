@@ -73,7 +73,10 @@ jobs:
             }
         features:
           - { args: --no-default-features, key: no-default }
-          - { args: --all-features, key: all }
+          - {
+              args: --no-default-features --features compression,common-controls-v6,config-json5,config-toml,custom-protocol,dbus,devtools,dynamic-acl,image-ico,image-png,isolation,linux-libxdo,macos-private-api,macos-proxy,native-tls,native-tls-vendored,objc-exception,process-relaunch-dangerous-allow-symlink-macos,protocol-asset,rustls-tls,specta,test,tracing,tray-icon,unstable,webview-data-url,wry,x11,
+              key: native-all,
+            }
 
     steps:
       - uses: actions/checkout@v7
@@ -93,7 +96,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           key: ${{ matrix.platform.target }}
-          save-if: ${{ matrix.features.key == 'all' }}
+          save-if: ${{ matrix.features.key == 'native-all' }}
 
       - name: install cross
         if: ${{ matrix.platform.cargo == 'cross' }}
@@ -115,3 +118,48 @@ jobs:
         run: |
           ${{ matrix.platform.cargo }} test --target ${{ matrix.platform.target }} ${{ matrix.features.args }} --examples --manifest-path crates/tauri/Cargo.toml
           ${{ matrix.platform.cargo }} test --target ${{ matrix.platform.target }} ${{ matrix.features.args }} --manifest-path examples/api/src-tauri/Cargo.toml
+
+  servo:
+    runs-on: ${{ matrix.platform.os }}
+    timeout-minutes: 45
+
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - { target: x86_64-pc-windows-msvc, os: windows-latest, features: servo }
+          - { target: x86_64-unknown-linux-gnu, os: ubuntu-latest, features: "servo,x11" }
+          - { target: aarch64-apple-darwin, os: macos-14, features: servo }
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: install Servo toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: '1.95.0'
+          targets: ${{ matrix.platform.target }}
+          components: clippy
+
+      - name: install Servo build dependencies
+        if: contains(matrix.platform.target, 'unknown-linux')
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libdbus-1-dev libegl1-mesa-dev libfontconfig1-dev libfreetype6-dev libharfbuzz-dev libx11-dev libxkbcommon-x11-dev lld
+          echo "RUSTFLAGS=-C link-arg=-fuse-ld=lld" >> "$GITHUB_ENV"
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: servo-${{ matrix.platform.target }}
+
+      - name: test Servo runtime adapter
+        run: cargo test --locked --lib --target ${{ matrix.platform.target }} --manifest-path crates/tauri-runtime-wry/Cargo.toml --no-default-features --features ${{ matrix.platform.features }}
+
+      - name: lint Servo runtime adapter
+        run: cargo clippy --locked --lib --target ${{ matrix.platform.target }} --manifest-path crates/tauri-runtime-wry/Cargo.toml --no-default-features --features ${{ matrix.platform.features }} -- -D warnings
+
+      - name: test Tauri with Servo
+        run: cargo test --locked --lib --target ${{ matrix.platform.target }} --manifest-path crates/tauri/Cargo.toml --no-default-features --features ${{ matrix.platform.features }}
+
+      - name: lint Tauri with Servo
+        run: cargo clippy --locked --lib --target ${{ matrix.platform.target }} --manifest-path crates/tauri/Cargo.toml --no-default-features --features ${{ matrix.platform.features }} -- -D warnings

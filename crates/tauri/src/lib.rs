@@ -11,6 +11,8 @@
 //! The following are a list of [Cargo features](https://doc.rust-lang.org/stable/cargo/reference/manifest.html#the-features-section) that can be enabled or disabled:
 //!
 //! - **wry** *(enabled by default)*: Enables the [wry](https://github.com/tauri-apps/wry) runtime. Only disable it if you want a custom runtime.
+//! - **wry_runtime**: Enables the Wry runtime without selecting a webview backend. This is enabled internally by both `wry` and `servo`.
+//! - **servo**: Replaces the platform webview with the experimental [Servo](https://servo.org/) backend on desktop targets. Disable default features when selecting this backend, and also enable `x11` on Linux.
 //! - **common-controls-v6** *(enabled by default)*: Enables [Common Controls v6](https://learn.microsoft.com/en-us/windows/win32/controls/common-control-versions) support on Windows, mainly for the predefined `about` menu item.
 //! - **x11** *(enabled by default)*: Enables X11 support. Disable this if you only target Wayland.
 //! - **dbus** *(enabled by default)*: Enables dbus dependency for theme support on Linux. Disable this if you do not need theme support or don't want to build the dbus rust crate. The WebView dependencies use dbus either way.
@@ -54,6 +56,9 @@
 )]
 #![warn(missing_docs, rust_2018_idioms)]
 #![cfg_attr(docsrs, feature(doc_cfg))]
+
+#[cfg(all(feature = "servo", not(desktop)))]
+compile_error!("the experimental Servo backend is only supported on desktop targets");
 
 /// Setups the binding that initializes an iOS plugin.
 #[cfg(target_os = "ios")]

@@ -27,6 +27,10 @@ This crate opens up direct systems-level interactions specifically for WRY, such
 None of the exposed API of this crate is stable, and it may break semver
 compatibility in the future. The major version only signifies the intended Tauri version.
 
+The optional `servo` feature replaces the operating-system webview with Wry's experimental Servo
+backend on Windows, macOS, and Linux/X11. Select it without default features; Linux builds must
+also enable `x11`.
+
 To learn more about the details of how all of these pieces fit together, please consult this [ARCHITECTURE.md](https://github.com/tauri-apps/tauri/blob/dev/ARCHITECTURE.md) document.
 
 ## Semver

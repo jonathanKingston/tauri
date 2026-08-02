@@ -12,6 +12,9 @@
   html_favicon_url = "https://github.com/tauri-apps/tauri/raw/dev/.github/icon.png"
 )]
 
+#[cfg(all(feature = "servo", not(desktop)))]
+compile_error!("the experimental Servo backend is only supported on desktop targets");
+
 use self::monitor::MonitorExt;
 use http::Request;
 #[cfg(all(not(feature = "servo"), target_os = "macos"))]

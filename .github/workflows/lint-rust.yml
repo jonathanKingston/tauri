@@ -18,6 +18,7 @@ on:
 env:
   RUST_BACKTRACE: 1
   CARGO_PROFILE_DEV_DEBUG: 0 # This would add unnecessary bloat to the target folder, decreasing cache efficiency.
+  NATIVE_FEATURES: compression,common-controls-v6,config-json5,config-toml,custom-protocol,dbus,devtools,dynamic-acl,image-ico,image-png,isolation,linux-libxdo,macos-private-api,macos-proxy,native-tls,native-tls-vendored,objc-exception,process-relaunch-dangerous-allow-symlink-macos,protocol-asset,rustls-tls,specta,test,tracing,tray-icon,unstable,webview-data-url,wry,x11
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -79,4 +80,4 @@ jobs:
         with:
           key: ${{ matrix.platform.target }}
 
-      - run: ${{ matrix.platform.cargo }} clippy --target ${{ matrix.platform.target }} ${{ matrix.platform.include }}--all-targets --all-features -- -D warnings
+      - run: ${{ matrix.platform.cargo }} clippy --target ${{ matrix.platform.target }} ${{ matrix.platform.include }}--all-targets --no-default-features --features ${{ env.NATIVE_FEATURES }} -- -D warnings
