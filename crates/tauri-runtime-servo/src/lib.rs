@@ -205,7 +205,6 @@ struct WebViewAttributes<'a> {
   pub download_started_handler: Option<Box<dyn FnMut(String, &mut PathBuf) -> bool>>,
   pub download_completed_handler: Option<Box<dyn Fn(String, Option<PathBuf>, bool)>>,
   pub javascript_disabled: bool,
-  pub autoplay: bool,
   pub user_agent: Option<String>,
   pub proxy_config: Option<ProxyConfig>,
 }
@@ -230,7 +229,6 @@ impl Default for WebViewAttributes<'_> {
       download_started_handler: None,
       download_completed_handler: None,
       javascript_disabled: false,
-      autoplay: true,
       user_agent: None,
       proxy_config: None,
     }
@@ -305,12 +303,6 @@ impl<'a> WebViewBuilder<'a> {
     self
   }
 
-  /// Sets whether all media can be played without user interaction.
-  pub fn with_autoplay(mut self, autoplay: bool) -> Self {
-    self.attrs.autoplay = autoplay;
-    self
-  }
-
   /// Disables JavaScript.
   pub fn with_javascript_disabled(mut self) -> Self {
     self.attrs.javascript_disabled = true;
@@ -335,21 +327,6 @@ impl<'a> WebViewBuilder<'a> {
         script: js.into(),
         for_main_frame_only,
       });
-    self
-  }
-
-  /// Register a custom protocol.
-  pub fn with_custom_protocol<F>(mut self, name: String, handler: F) -> Self
-  where
-    F: Fn(WebViewId, Request<Vec<u8>>) -> Response<Cow<'static, [u8]>> + Send + Sync + 'static,
-  {
-    self
-      .attrs
-      .custom_protocols
-      .insert(name, Box::new(move |id, request, responder| {
-        let http_response = handler(id, request);
-        responder.respond(http_response);
-      }));
     self
   }
 
@@ -419,19 +396,6 @@ impl<'a> WebViewBuilder<'a> {
   /// Set the url to be loaded.
   pub fn with_url(mut self, url: impl Into<String>) -> Self {
     self.attrs.url = Some(url.into());
-    self
-  }
-
-  /// Set the url to be loaded with the given headers.
-  pub fn with_url_and_headers(mut self, url: impl Into<String>, headers: http::HeaderMap) -> Self {
-    self.attrs.url = Some(url.into());
-    self.attrs.headers = Some(headers);
-    self
-  }
-
-  /// Set the HTML to be loaded.
-  pub fn with_html(mut self, html: impl Into<String>) -> Self {
-    self.attrs.html = Some(html.into());
     self
   }
 
