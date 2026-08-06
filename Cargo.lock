@@ -13227,6 +13227,7 @@ dependencies = [
  "tauri-build",
  "tauri-macros",
  "tauri-runtime",
+ "tauri-runtime-servo",
  "tauri-runtime-wry",
  "tauri-utils",
  "thiserror 2.0.19",
@@ -13568,6 +13569,32 @@ dependencies = [
  "webkit2gtk",
  "webview2-com",
  "windows 0.61.1",
+]
+
+[[package]]
+name = "tauri-runtime-servo"
+version = "0.1.0"
+dependencies = [
+ "cookie 0.18.1",
+ "dpi",
+ "euclid",
+ "futures-channel",
+ "http 1.5.0",
+ "jni 0.21.1",
+ "keyboard-types 0.8.3",
+ "log",
+ "objc2 0.6.4",
+ "objc2-app-kit",
+ "percent-encoding",
+ "raw-window-handle",
+ "rustls",
+ "servo",
+ "tao",
+ "tauri-runtime",
+ "tauri-utils",
+ "thiserror 2.0.19",
+ "tracing",
+ "url",
 ]
 
 [[package]]

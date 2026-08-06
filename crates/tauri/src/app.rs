@@ -1563,6 +1563,14 @@ pub(crate) struct InvokeInitializationScript<'a> {
 }
 
 /// Make `Wry` the default `Runtime` for `Builder`
+#[cfg(feature = "servo")]
+#[cfg_attr(docsrs, doc(cfg(feature = "servo")))]
+impl Default for Builder<crate::Servo> {
+  fn default() -> Self {
+    Self::new()
+  }
+}
+
 #[cfg(feature = "wry_runtime")]
 #[cfg_attr(docsrs, doc(cfg(feature = "wry_runtime")))]
 impl Default for Builder<crate::Wry> {
@@ -1571,8 +1579,8 @@ impl Default for Builder<crate::Wry> {
   }
 }
 
-#[cfg(not(feature = "wry_runtime"))]
-#[cfg_attr(docsrs, doc(cfg(not(feature = "wry_runtime"))))]
+#[cfg(not(any(feature = "wry_runtime", feature = "servo")))]
+#[cfg_attr(docsrs, doc(cfg(not(any(feature = "wry_runtime", feature = "servo")))))]
 impl<R: Runtime> Default for Builder<R> {
   fn default() -> Self {
     Self::new()

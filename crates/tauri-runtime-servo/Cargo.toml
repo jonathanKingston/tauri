@@ -1,0 +1,71 @@
+[package]
+name = "tauri-runtime-servo"
+version = "0.1.0"
+description = "Servo bindings to the Tauri runtime"
+exclude = ["CHANGELOG.md", "/target"]
+readme = "README.md"
+authors.workspace = true
+homepage.workspace = true
+repository.workspace = true
+categories.workspace = true
+license.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[package.metadata.docs.rs]
+all-features = true
+default-target = "x86_64-unknown-linux-gnu"
+targets = [
+  "x86_64-pc-windows-msvc",
+  "x86_64-unknown-linux-gnu",
+  "x86_64-apple-darwin",
+]
+
+[dependencies]
+servo = { version = "0.4.0", git = "https://github.com/servo/servo.git", rev = "f4dde2701bacd4972e6cfa319a3f0cbc9be21f64" }
+tao = { version = "0.36", default-features = false, features = ["rwh_06"] }
+tauri-runtime = { version = "2.11.3", path = "../tauri-runtime" }
+tauri-utils = { version = "2.9.3", path = "../tauri-utils" }
+raw-window-handle = "0.6"
+euclid = "0.22"
+futures-channel = "0.3"
+keyboard-types = "0.8.3"
+percent-encoding = "2.3"
+url = "2.5"
+http = "1"
+dpi = "0.1"
+cookie = "0.18"
+thiserror = "2"
+rustls = { version = "0.23", default-features = false, features = [
+  "aws-lc-rs",
+  "logging",
+  "std",
+  "tls12",
+] }
+tracing = { version = "0.1", optional = true }
+log = "0.4.21"
+
+[target."cfg(target_os = \"macos\")".dependencies]
+objc2-app-kit = { version = "0.3.2", default-features = false, features = [
+  "block2",
+  "NSApplication",
+  "NSResponder",
+  "NSView",
+  "NSWindow",
+  "NSScreen",
+  "NSGraphics",
+] }
+objc2 = "0.6"
+
+[target."cfg(target_os = \"android\")".dependencies]
+jni = "0.21"
+
+[features]
+default = ["x11", "dbus"]
+devtools = ["tauri-runtime/devtools"]
+x11 = ["tao/x11"]
+macos-private-api = ["tauri-runtime/macos-private-api"]
+macos-proxy = []
+unstable = []
+tracing = ["dep:tracing"]
+dbus = ["tao/dbus"]

@@ -130,6 +130,15 @@ pub type Wry = tauri_runtime_wry::Wry<EventLoopMessage>;
 #[cfg_attr(docsrs, doc(cfg(feature = "wry_runtime")))]
 pub type WryHandle = tauri_runtime_wry::WryHandle<EventLoopMessage>;
 
+/// A Tauri [`Runtime`] wrapper around the experimental Servo backend.
+#[cfg(feature = "servo")]
+#[cfg_attr(docsrs, doc(cfg(feature = "servo")))]
+pub type Servo = tauri_runtime_servo::Servo<EventLoopMessage>;
+/// A Tauri [`RuntimeHandle`] wrapper around the experimental Servo backend.
+#[cfg(feature = "servo")]
+#[cfg_attr(docsrs, doc(cfg(feature = "servo")))]
+pub type ServoHandle = tauri_runtime_servo::ServoHandle<EventLoopMessage>;
+
 #[cfg(all(feature = "wry", target_os = "android"))]
 #[cfg_attr(docsrs, doc(cfg(all(feature = "wry", target_os = "android"))))]
 #[doc(hidden)]
