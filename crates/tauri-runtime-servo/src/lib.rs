@@ -20,8 +20,6 @@ use http::{Request, Response};
 use std::borrow::Cow;
 use raw_window_handle::{DisplayHandle, HasDisplayHandle, HasWindowHandle};
 
-#[cfg(windows)]
-use tauri_runtime::webview::ScrollBarStyle;
 use tauri_runtime::{
   dpi::{LogicalPosition, LogicalSize, PhysicalPosition, PhysicalSize, Position, Size},
   monitor::Monitor,
@@ -88,10 +86,7 @@ use tauri_runtime::ActivationPolicy;
 
 use std::{
   cell::RefCell,
-  collections::{
-    hash_map::Entry::{Occupied, Vacant},
-    BTreeMap, HashMap, HashSet,
-  },
+  collections::{BTreeMap, HashMap},
   fmt,
   ops::Deref,
   path::PathBuf,
@@ -107,8 +102,6 @@ use std::{
 pub type WebviewId = u32;
 type IpcHandler = dyn Fn(Request<String>) + 'static;
 
-#[cfg(not(debug_assertions))]
-mod dialog;
 mod monitor;
 pub mod servo;
 #[cfg(windows)]
@@ -209,7 +202,6 @@ struct WebViewAttributes<'a> {
   pub navigation_handler: Option<Box<dyn Fn(String) -> bool>>,
   pub document_title_changed_handler: Option<Box<dyn Fn(String)>>,
   pub on_page_load_handler: Option<Box<dyn Fn(PageLoadEvent, String)>>,
-  pub new_window_req_handler: Option<Box<dyn Fn(String, Option<String>) -> NewWindowResponse>>,
   pub download_started_handler: Option<Box<dyn FnMut(String, &mut PathBuf) -> bool>>,
   pub download_completed_handler: Option<Box<dyn Fn(String, Option<PathBuf>, bool)>>,
   pub javascript_disabled: bool,
@@ -235,7 +227,6 @@ impl Default for WebViewAttributes<'_> {
       navigation_handler: None,
       document_title_changed_handler: None,
       on_page_load_handler: None,
-      new_window_req_handler: None,
       download_started_handler: None,
       download_completed_handler: None,
       javascript_disabled: false,
@@ -245,10 +236,6 @@ impl Default for WebViewAttributes<'_> {
     }
   }
 }
-
-/// Platform specific webview attributes.
-#[derive(Default)]
-pub(crate) struct PlatformSpecificWebViewAttributes {}
 
 /// The fundamental type to present a [`WebView`].
 ///
@@ -281,7 +268,6 @@ impl WebView {
 /// Webview builder that is used to create a [`WebView`].
 pub struct WebViewBuilder<'a> {
   pub(crate) attrs: WebViewAttributes<'a>,
-  pub(crate) platform_specific: PlatformSpecificWebViewAttributes,
   /// Records errors before the [`WebViewBuilder::build_servo`] is called.
   pub(crate) error: crate::ServoResult<()>,
 }
@@ -291,16 +277,8 @@ impl<'a> WebViewBuilder<'a> {
   pub fn new() -> Self {
     Self {
       attrs: WebViewAttributes::default(),
-      platform_specific: PlatformSpecificWebViewAttributes::default(),
       error: Ok(()),
     }
-  }
-
-  /// Create a new [`WebViewBuilder`] without an explicit web context.
-  ///
-  /// Kept for parity with the builder API; Servo manages its own storage.
-  pub fn new_with_web_context(_web_context: &'a mut WebContext) -> Self {
-    Self::new()
   }
 
   /// Set an id that will be passed when this webview makes requests in certain callbacks.
@@ -327,45 +305,9 @@ impl<'a> WebViewBuilder<'a> {
     self
   }
 
-  /// Whether the WebView should be focused.
-  pub fn with_focused(self, focused: bool) -> Self {
-    let _ = focused;
-    self
-  }
-
   /// Sets whether all media can be played without user interaction.
   pub fn with_autoplay(mut self, autoplay: bool) -> Self {
     self.attrs.autoplay = autoplay;
-    self
-  }
-
-  /// Whether the first mouse click is accepted.
-  pub fn with_accept_first_mouse(self, _accept: bool) -> Self {
-    self
-  }
-
-  /// Sets whether the WebView should be incognito.
-  pub fn with_incognito(self, _incognito: bool) -> Self {
-    self
-  }
-
-  /// Sets whether the clipboard is enabled.
-  pub fn with_clipboard(self, _clipboard: bool) -> Self {
-    self
-  }
-
-  /// Sets whether zoom hotkeys are enabled.
-  pub fn with_hotkeys_zoom(self, _enabled: bool) -> Self {
-    self
-  }
-
-  /// Sets whether the general autofill is enabled.
-  pub fn with_general_autofill_enabled(self, _enabled: bool) -> Self {
-    self
-  }
-
-  /// Sets whether background throttling is enabled.
-  pub fn with_background_throttling(self, _policy: BackgroundThrottlingPolicy) -> Self {
     self
   }
 
@@ -435,15 +377,6 @@ impl<'a> WebViewBuilder<'a> {
     F: Fn(String) -> bool + 'static,
   {
     self.attrs.navigation_handler = Some(Box::new(callback));
-    self
-  }
-
-  /// Set the new window request handler.
-  pub fn with_new_window_req_handler<F>(mut self, callback: F) -> Self
-  where
-    F: Fn(String, Option<String>) -> NewWindowResponse + 'static,
-  {
-    self.attrs.new_window_req_handler = Some(Box::new(callback));
     self
   }
 
@@ -519,40 +452,12 @@ impl<'a> WebViewBuilder<'a> {
     self.attrs.proxy_config = Some(config);
     self
   }
-
-  /// Enable or disable devtools.
-  #[cfg(any(debug_assertions, feature = "devtools"))]
-  pub fn with_devtools(self, _enabled: bool) -> Self {
-    self
-  }
 }
 
 impl Default for WebViewBuilder<'_> {
   fn default() -> Self {
     Self::new()
   }
-}
-
-/// A policy for controlling background throttling of the webview.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum BackgroundThrottlingPolicy {
-  /// Disables the background throttling.
-  Disabled,
-  /// Automatically throttles the webview.
-  Throttle,
-  /// Suspend the webview.
-  Suspend,
-}
-
-/// Response to a request to open a new window.
-#[derive(Debug, Clone)]
-pub enum NewWindowResponse {
-  /// Deny the request.
-  Deny,
-  /// Allow the request.
-  Allow,
-  /// Create a new window with the given raw window handle.
-  Create { webview: raw_window_handle::RawWindowHandle },
 }
 
 /// The configuration of a proxy server.
@@ -573,18 +478,6 @@ pub struct ProxyEndpoint {
   pub port: u16,
 }
 
-/// A web context shared by webviews.
-///
-/// Servo manages its own storage, so this is a minimal holder kept for API parity.
-#[derive(Debug, Default)]
-pub struct WebContext {
-  pub referenced_by_webviews: HashSet<String>,
-  // on Linux the custom protocols are associated with the context
-  // and you cannot register a URI scheme more than once
-  pub registered_custom_protocols: HashSet<String>,
-}
-
-pub type WebContextStore = Arc<Mutex<HashMap<Option<PathBuf>, WebContext>>>;
 // window
 pub type WindowEventHandler = Box<dyn Fn(&WindowEvent) + Send>;
 pub type WindowEventListeners = Arc<Mutex<HashMap<WindowEventId, WindowEventHandler>>>;
@@ -671,12 +564,10 @@ pub struct Context<T: UserEvent> {
   main_thread_id: ThreadId,
   pub proxy: TaoEventLoopProxy<Message<T>>,
   main_thread: DispatcherMainThreadContext<T>,
-  plugins: Arc<Mutex<Vec<Box<dyn Plugin<T> + Send>>>>,
   next_window_id: Arc<AtomicU32>,
   next_webview_id: Arc<AtomicU32>,
   next_window_event_id: Arc<AtomicU32>,
   next_webview_event_id: Arc<AtomicU32>,
-  webview_runtime_installed: bool,
 }
 
 unsafe impl<T: UserEvent> Send for Context<T> {}
@@ -854,7 +745,6 @@ pub struct WindowsStore(pub RefCell<BTreeMap<WindowId, WindowWrapper>>);
 #[derive(Debug, Clone)]
 pub struct DispatcherMainThreadContext<T: UserEvent> {
   pub window_target: EventLoopWindowTarget<Message<T>>,
-  pub web_context: WebContextStore,
   // changing this to an Rc will cause frequent app crashes.
   pub windows: Arc<WindowsStore>,
   #[cfg(feature = "tracing")]
@@ -2898,10 +2788,7 @@ pub struct WebviewWrapper {
   label: String,
   id: WebviewId,
   inner: Rc<WebView>,
-  context_store: WebContextStore,
   webview_event_listeners: WebviewEventListeners,
-  // the key of the WebContext if it's not shared
-  context_key: Option<PathBuf>,
   bounds: Arc<Mutex<Option<WebviewBounds>>>,
 }
 
@@ -2911,34 +2798,6 @@ impl Deref for WebviewWrapper {
   #[inline(always)]
   fn deref(&self) -> &Self::Target {
     &self.inner
-  }
-}
-
-impl Drop for WebviewWrapper {
-  fn drop(&mut self) {
-    if Rc::get_mut(&mut self.inner).is_some() {
-      let mut context_store = self.context_store.lock().unwrap();
-
-      if let Some(web_context) = context_store.get_mut(&self.context_key) {
-        web_context.referenced_by_webviews.remove(&self.label);
-
-        // https://github.com/tauri-apps/tauri/issues/14626
-        // Because WebKit does not close its network process even when no webviews are running,
-        // we need to ensure to re-use the existing process on Linux by keeping the WebContext
-        // alive for the lifetime of the app.
-        // WebKit on macOS handles this itself.
-        #[cfg(not(any(
-          target_os = "linux",
-          target_os = "dragonfly",
-          target_os = "freebsd",
-          target_os = "netbsd",
-          target_os = "openbsd"
-        )))]
-        if web_context.referenced_by_webviews.is_empty() {
-          context_store.remove(&self.context_key);
-        }
-      }
-    }
   }
 }
 
@@ -3009,23 +2868,6 @@ impl<T: UserEvent> EventLoopProxy<T> for EventProxy<T> {
   }
 }
 
-pub trait PluginBuilder<T: UserEvent> {
-  type Plugin: Plugin<T>;
-  fn build(self, context: Context<T>) -> Self::Plugin;
-}
-
-pub trait Plugin<T: UserEvent> {
-  fn on_event(
-    &mut self,
-    event: &Event<Message<T>>,
-    event_loop: &EventLoopWindowTarget<Message<T>>,
-    proxy: &TaoEventLoopProxy<Message<T>>,
-    control_flow: &mut ControlFlow,
-    context: EventLoopIterationContext<'_, T>,
-    web_context: &WebContextStore,
-  ) -> bool;
-}
-
 /// A Tauri [`Runtime`] wrapper around Servo.
 pub struct Servo<T: UserEvent> {
   context: Context<T>,
@@ -3038,7 +2880,6 @@ impl<T: UserEvent> fmt::Debug for Servo<T> {
       .field("main_thread_id", &self.context.main_thread_id)
       .field("event_loop", &self.event_loop)
       .field("windows", &self.context.main_thread.windows)
-      .field("web_context", &self.context.main_thread.web_context)
       .finish()
   }
 }
@@ -3078,18 +2919,6 @@ impl<T: UserEvent> ServoHandle<T> {
       .send_event(message)
       .map_err(|_| Error::FailedToSendMessage)?;
     Ok(())
-  }
-
-  pub fn plugin<P: PluginBuilder<T> + 'static>(&mut self, plugin: P)
-  where
-    <P as PluginBuilder<T>>::Plugin: Send,
-  {
-    self
-      .context
-      .plugins
-      .lock()
-      .unwrap()
-      .push(Box::new(plugin.build(self.context.clone())));
   }
 }
 
@@ -3287,7 +3116,6 @@ impl<T: UserEvent> Servo<T> {
   fn init(event_loop: EventLoop<Message<T>>) -> Result<Self> {
     install_rustls_crypto_provider();
     let main_thread_id = current_thread().id();
-    let web_context = WebContextStore::default();
 
     #[allow(clippy::arc_with_non_send_sync)]
     let windows = Arc::new(WindowsStore(RefCell::new(BTreeMap::default())));
@@ -3299,17 +3127,14 @@ impl<T: UserEvent> Servo<T> {
       proxy: event_loop.create_proxy(),
       main_thread: DispatcherMainThreadContext {
         window_target: event_loop.deref().clone(),
-        web_context,
         windows,
         #[cfg(feature = "tracing")]
         active_tracing_spans: Default::default(),
       },
-      plugins: Default::default(),
       next_window_id: Default::default(),
       next_webview_id: Default::default(),
       next_window_event_id: Default::default(),
       next_webview_event_id: Default::default(),
-      webview_runtime_installed: true,
     };
 
     Ok(Self {
@@ -3566,55 +3391,27 @@ impl<T: UserEvent> Runtime<T> for Servo<T> {
     use tao::platform::run_return::EventLoopExtRunReturn;
     let windows = &self.context.main_thread.windows;
     let window_id_map = &self.context.window_id_map;
-    let web_context = &self.context.main_thread.web_context;
-    let plugins = &self.context.plugins;
 
     #[cfg(feature = "tracing")]
     let active_tracing_spans = &self.context.main_thread.active_tracing_spans;
 
-    let proxy = self.event_loop.create_proxy();
+    self.event_loop.run_return(|event, event_loop, control_flow| {
+      *control_flow = ControlFlow::Wait;
+      if let Event::MainEventsCleared = &event {
+        *control_flow = ControlFlow::Exit;
+      }
 
-    self
-      .event_loop
-      .run_return(|event, event_loop, control_flow| {
-        *control_flow = ControlFlow::Wait;
-        if let Event::MainEventsCleared = &event {
-          *control_flow = ControlFlow::Exit;
-        }
-
-        for p in plugins.lock().unwrap().iter_mut() {
-          let prevent_default = p.on_event(
-            &event,
-            event_loop,
-            &proxy,
-            control_flow,
-            EventLoopIterationContext {
-              callback: &mut callback,
-              window_id_map,
-              windows,
-              #[cfg(feature = "tracing")]
-              active_tracing_spans,
-            },
-            web_context,
-          );
-          if prevent_default {
-            return;
-          }
-        }
-
-        handle_event_loop(
-          event,
-          event_loop,
-          control_flow,
-          EventLoopIterationContext {
-            callback: &mut callback,
-            windows,
-            window_id_map,
-            #[cfg(feature = "tracing")]
-            active_tracing_spans,
-          },
-        );
-      });
+      handle_event_loop(
+        event,
+        event_loop,
+        control_flow,
+        &mut callback,
+        window_id_map,
+        windows,
+        #[cfg(feature = "tracing")]
+        active_tracing_spans,
+      );
+    });
   }
 
   fn run<F: FnMut(RunEvent<T>) + 'static>(self, callback: F) {
@@ -3643,54 +3440,22 @@ fn make_event_handler<T: UserEvent, F: FnMut(RunEvent<T>) + 'static>(
 ) -> impl FnMut(Event<'_, Message<T>>, &EventLoopWindowTarget<Message<T>>, &mut ControlFlow) {
   let windows = context.main_thread.windows;
   let window_id_map = context.window_id_map;
-  let web_context = context.main_thread.web_context;
-  let plugins = context.plugins;
 
   #[cfg(feature = "tracing")]
   let active_tracing_spans = context.main_thread.active_tracing_spans;
-  let proxy = context.proxy;
 
   move |event, event_loop, control_flow| {
-    for p in plugins.lock().unwrap().iter_mut() {
-      let prevent_default = p.on_event(
-        &event,
-        event_loop,
-        &proxy,
-        control_flow,
-        EventLoopIterationContext {
-          callback: &mut callback,
-          window_id_map: &window_id_map,
-          windows: &windows,
-          #[cfg(feature = "tracing")]
-          active_tracing_spans: &active_tracing_spans,
-        },
-        &web_context,
-      );
-      if prevent_default {
-        return;
-      }
-    }
     handle_event_loop(
       event,
       event_loop,
       control_flow,
-      EventLoopIterationContext {
-        callback: &mut callback,
-        window_id_map: &window_id_map,
-        windows: &windows,
-        #[cfg(feature = "tracing")]
-        active_tracing_spans: &active_tracing_spans,
-      },
+      &mut callback,
+      &window_id_map,
+      &windows,
+      #[cfg(feature = "tracing")]
+      &active_tracing_spans,
     );
   }
-}
-
-pub struct EventLoopIterationContext<'a, T: UserEvent> {
-  pub callback: &'a mut (dyn FnMut(RunEvent<T>) + 'static),
-  pub window_id_map: &'a WindowIdStore,
-  pub windows: &'a WindowsStore,
-  #[cfg(feature = "tracing")]
-  pub active_tracing_spans: &'a ActiveTraceSpanStore,
 }
 
 struct UserMessageContext<'a> {
@@ -4491,15 +4256,11 @@ fn handle_event_loop<T: UserEvent>(
   event: Event<'_, Message<T>>,
   event_loop: &EventLoopWindowTarget<Message<T>>,
   control_flow: &mut ControlFlow,
-  context: EventLoopIterationContext<'_, T>,
+  callback: &mut (dyn FnMut(RunEvent<T>) + 'static),
+  window_id_map: &WindowIdStore,
+  windows: &WindowsStore,
+  #[cfg(feature = "tracing")] active_tracing_spans: &ActiveTraceSpanStore,
 ) {
-  let EventLoopIterationContext {
-    callback,
-    window_id_map,
-    windows,
-    #[cfg(feature = "tracing")]
-    active_tracing_spans,
-  } = context;
   if *control_flow != ControlFlow::Exit {
     *control_flow = ControlFlow::Wait;
   }
@@ -5074,24 +4835,6 @@ fn create_webview<T: UserEvent>(
   pending: PendingWebview<T, Servo<T>>,
   #[allow(unused_variables)] focused_webview: Arc<Mutex<FocusState>>,
 ) -> Result<WebviewWrapper> {
-  if !context.webview_runtime_installed {
-    #[cfg(all(not(debug_assertions), windows))]
-    dialog::error(
-      r#"Could not find the WebView2 Runtime.
-
-Make sure it is installed or download it from <A href="https://developer.microsoft.com/en-us/microsoft-edge/webview2">https://developer.microsoft.com/en-us/microsoft-edge/webview2</A>
-
-You may have it installed on another user account, but it is not available for this one.
-"#,
-    );
-
-    if cfg!(target_os = "macos") {
-      log::warn!("WebKit webview runtime not found, attempting to create webview anyway.");
-    } else {
-      return Err(Error::WebviewRuntimeNotInstalled);
-    }
-  }
-
   #[allow(unused_mut)]
   let PendingWebview {
     webview_attributes,
@@ -5102,39 +4845,9 @@ You may have it installed on another user account, but it is not available for t
     ..
   } = pending;
 
-  let mut web_context = context
-    .main_thread
-    .web_context
-    .lock()
-    .expect("poisoned WebContext store");
-  let _is_first_context = web_context.is_empty();
-  // the context must be stored on the HashMap because it must outlive the WebView on macOS
-  let automation_enabled = std::env::var("TAURI_WEBVIEW_AUTOMATION").as_deref() == Ok("true");
-  let web_context_key = webview_attributes.data_directory;
-  let entry = web_context.entry(web_context_key.clone());
-  #[allow(unused_variables)]
-  let web_context = match entry {
-    Occupied(occupied) => {
-      let occupied = occupied.into_mut();
-      occupied.referenced_by_webviews.insert(label.clone());
-      occupied
-    }
-    Vacant(vacant) => {
-      let mut web_context = WebContext::default();
-      web_context.referenced_by_webviews.insert(label.clone());
-      vacant.insert(web_context)
-    }
-  };
-
   let mut webview_builder = WebViewBuilder::new()
     .with_id(&label)
-    .with_focused(webview_attributes.focus)
-    .with_transparent(webview_attributes.transparent)
-    .with_accept_first_mouse(webview_attributes.accept_first_mouse)
-    .with_incognito(webview_attributes.incognito)
-    .with_clipboard(webview_attributes.clipboard)
-    .with_hotkeys_zoom(webview_attributes.zoom_hotkeys_enabled)
-    .with_general_autofill_enabled(webview_attributes.general_autofill_enabled);
+    .with_transparent(webview_attributes.transparent);
 
   if url != "about:blank" {
     webview_builder = webview_builder.with_url(&url);
@@ -5263,25 +4976,6 @@ You may have it installed on another user account, but it is not available for t
   }
 
   for (scheme, protocol) in uri_scheme_protocols {
-    // on Linux the custom protocols are associated with the web context
-    // and you cannot register a scheme more than once
-    #[cfg(any(
-      target_os = "linux",
-      target_os = "dragonfly",
-      target_os = "freebsd",
-      target_os = "netbsd",
-      target_os = "openbsd"
-    ))]
-    {
-      if web_context.registered_custom_protocols.contains(&scheme) {
-        continue;
-      }
-
-      web_context
-        .registered_custom_protocols
-        .insert(scheme.clone());
-    }
-
     webview_builder = webview_builder.with_asynchronous_custom_protocol(
       scheme,
       move |webview_id, request, responder| {
@@ -5292,11 +4986,6 @@ You may have it installed on another user account, but it is not available for t
         )
       },
     );
-  }
-
-  #[cfg(any(debug_assertions, feature = "devtools"))]
-  {
-    webview_builder = webview_builder.with_devtools(webview_attributes.devtools.unwrap_or(true));
   }
 
   #[cfg(target_os = "android")]
@@ -5326,13 +5015,7 @@ You may have it installed on another user account, but it is not available for t
     label,
     id,
     inner: Rc::new(webview),
-    context_store: context.main_thread.web_context.clone(),
     webview_event_listeners: Default::default(),
-    context_key: if automation_enabled {
-      None
-    } else {
-      web_context_key
-    },
     bounds: Arc::new(Mutex::new(webview_bounds)),
   })
 }

@@ -46,7 +46,6 @@ impl InnerWebView {
     window: Window,
     proxy: EventLoopProxy<()>,
     attributes: WebViewAttributes<'_>,
-    _platform_attributes: super::PlatformSpecificWebViewAttributes,
   ) -> Result<Self> {
     crate::install_rustls_crypto_provider();
     let id = attributes.id.unwrap_or("servo").to_owned();
@@ -102,7 +101,6 @@ impl InnerWebView {
     parent: &Window,
     wake: impl Fn() + Send + Sync + 'static,
     attributes: WebViewAttributes<'_>,
-    _platform_attributes: super::PlatformSpecificWebViewAttributes,
   ) -> Result<Self> {
     crate::install_rustls_crypto_provider();
     let id = attributes.id.unwrap_or("servo").to_owned();
@@ -418,7 +416,7 @@ pub trait WebViewBuilderExtServo<'a> {
 impl<'a> WebViewBuilderExtServo<'a> for WebViewBuilder<'a> {
   fn build_servo(self, window: Window, proxy: EventLoopProxy<()>) -> Result<super::WebView> {
     self.error?;
-    InnerWebView::new_servo(window, proxy, self.attrs, self.platform_specific)
+    InnerWebView::new_servo(window, proxy, self.attrs)
       .map(|webview| super::WebView { webview })
   }
 
@@ -428,7 +426,7 @@ impl<'a> WebViewBuilderExtServo<'a> for WebViewBuilder<'a> {
     wake: impl Fn() + Send + Sync + 'static,
   ) -> Result<super::WebView> {
     self.error?;
-    InnerWebView::new_servo_as_child(parent, wake, self.attrs, self.platform_specific)
+    InnerWebView::new_servo_as_child(parent, wake, self.attrs)
       .map(|webview| super::WebView { webview })
   }
 }
