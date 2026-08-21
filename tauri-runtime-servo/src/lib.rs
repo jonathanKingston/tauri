@@ -12,6 +12,9 @@
   html_favicon_url = "https://github.com/tauri-apps/tauri/raw/dev/.github/icon.png"
 )]
 
+// matches wry, where these boxed-handler types originate
+#![allow(clippy::type_complexity)]
+
 #[cfg(not(desktop))]
 compile_error!("the experimental Servo backend is only supported on desktop targets");
 
@@ -1157,7 +1160,6 @@ impl WindowBuilder for WindowBuilderWrapper {
       .content_protected(config.content_protected)
       .skip_taskbar(config.skip_taskbar)
       .theme(config.theme)
-      .no_redirection_bitmap(config.no_redirection_bitmap)
       .closable(config.closable)
       .maximizable(config.maximizable)
       .minimizable(config.minimizable)
@@ -1513,14 +1515,6 @@ impl WindowBuilder for WindowBuilderWrapper {
   }
   #[cfg(not(windows))]
   fn window_classname<S: Into<String>>(self, _window_classname: S) -> Self {
-    self
-  }
-
-  fn no_redirection_bitmap(#[allow(unused_mut)] mut self, _enable: bool) -> Self {
-    #[cfg(windows)]
-    {
-      self.inner = self.inner.with_no_redirection_bitmap(_enable);
-    }
     self
   }
 
@@ -3812,23 +3806,6 @@ fn handle_user_message<T: UserEvent>(
             let reparent_result: crate::ServoResult<()> = Err(crate::ServoError::Servo(
               "reparenting embedded Servo webviews is not supported".into(),
             ));
-            #[cfg(windows)]
-            let reparent_result = { webview.inner.reparent(new_parent_window.hwnd()) };
-
-            #[cfg(any(
-              target_os = "linux",
-              target_os = "dragonfly",
-              target_os = "freebsd",
-              target_os = "netbsd",
-              target_os = "openbsd"
-            ))]
-            let reparent_result = {
-              if let Some(container) = new_parent_window.default_vbox() {
-                webview.inner.reparent(container)
-              } else {
-                Err(crate::ServoError::MessageSender)
-              }
-            };
 
             match reparent_result {
               Ok(_) => {
@@ -4097,22 +4074,7 @@ fn handle_user_message<T: UserEvent>(
             }
           },
           WebviewMessage::WithWebview(f) => {
-            #[cfg(target_os = "macos")]
-            {
-              f(Webview);
-            }
-            #[cfg(target_os = "ios")]
-            {
-              f(Webview);
-            }
-            #[cfg(windows)]
-            {
-              f(Webview);
-            }
-            #[cfg(target_os = "android")]
-            {
-              f(webview.handle())
-            }
+            f(Webview);
           }
           #[cfg(any(debug_assertions, feature = "devtools"))]
           WebviewMessage::OpenDevTools => {
