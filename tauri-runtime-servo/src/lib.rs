@@ -12,9 +12,6 @@
   html_favicon_url = "https://github.com/tauri-apps/tauri/raw/dev/.github/icon.png"
 )]
 
-// matches wry, where these boxed-handler types originate
-#![allow(clippy::type_complexity)]
-
 #[cfg(not(desktop))]
 compile_error!("the experimental Servo backend is only supported on desktop targets");
 
@@ -185,8 +182,21 @@ pub struct InitializationScript {
 ///
 /// See [`WebViewBuilder::with_asynchronous_custom_protocol`] for more information.
 pub struct RequestAsyncResponder {
-  pub(crate) responder: Box<dyn FnOnce(Response<Cow<'static, [u8]>>)>,
+  pub(crate) responder: AsyncResponderFn,
 }
+
+/// Boxed closure resolving an asynchronous custom protocol request.
+pub(crate) type AsyncResponderFn = Box<dyn FnOnce(Response<Cow<'static, [u8]>>)>;
+
+/// Boxed handler for a custom protocol request.
+type CustomProtocolHandler =
+  Box<dyn Fn(WebViewId, Request<Vec<u8>>, RequestAsyncResponder) + Send + Sync>;
+
+/// Boxed handler deciding whether a download may start (may rewrite the path).
+type DownloadStartedHandler = Box<dyn FnMut(String, &mut PathBuf) -> bool>;
+
+/// Boxed handler observing a finished (or failed) download.
+type DownloadCompletedHandler = Box<dyn Fn(String, Option<PathBuf>, bool)>;
 
 // SAFETY: even though the webview bindings do not indicate the responder is Send,
 // it actually is and we need it in order to let the user do the protocol computation
@@ -215,14 +225,13 @@ struct WebViewAttributes<'a> {
   pub html: Option<String>,
   pub bounds: Option<Rect>,
   pub initialization_scripts: Vec<InitializationScript>,
-  pub custom_protocols:
-    HashMap<String, Box<dyn Fn(WebViewId, Request<Vec<u8>>, RequestAsyncResponder) + Send + Sync>>,
+  pub custom_protocols: HashMap<String, CustomProtocolHandler>,
   pub ipc_handler: Option<Box<dyn Fn(Request<String>)>>,
   pub navigation_handler: Option<Box<dyn Fn(String) -> bool>>,
   pub document_title_changed_handler: Option<Box<dyn Fn(String)>>,
   pub on_page_load_handler: Option<Box<dyn Fn(PageLoadEvent, String)>>,
-  pub download_started_handler: Option<Box<dyn FnMut(String, &mut PathBuf) -> bool>>,
-  pub download_completed_handler: Option<Box<dyn Fn(String, Option<PathBuf>, bool)>>,
+  pub download_started_handler: Option<DownloadStartedHandler>,
+  pub download_completed_handler: Option<DownloadCompletedHandler>,
   pub javascript_disabled: bool,
   pub user_agent: Option<String>,
   pub proxy_config: Option<ProxyConfig>,
@@ -3802,6 +3811,9 @@ fn handle_user_message<T: UserEvent>(
             .get_mut(&new_parent_window_id)
             .map(|w| (w.inner.clone(), &mut w.webviews))
           {
+            // Servo's embedding API has no webview reparenting; a Servo
+            // webview also composites into exactly one native window (see
+            // README "Known limitations"), so this is a hard unsupported.
             let _ = &new_parent_window;
             let reparent_result: crate::ServoResult<()> = Err(crate::ServoError::Servo(
               "reparenting embedded Servo webviews is not supported".into(),
